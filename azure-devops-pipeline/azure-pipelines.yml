@@ -1,0 +1,261 @@
+---
+# End-to-End Azure DevOps CI/CD Pipeline
+# Build -> Test -> Security Scan -> Provision Infra (Bicep) -> Deploy Dev -> Deploy Staging (approval) -> Deploy Prod (approval)
+
+trigger:
+  branches:
+    include:
+      - main
+      - develop
+
+pr:
+  branches:
+    include:
+      - main
+
+variables:
+  buildConfiguration: 'Release'
+  azureSubscription: 'azure-service-connection'
+  resourceGroupName: 'rg-app-$(environmentSuffix)'
+  location: 'eastus'
+  appName: 'e2e-devops-app'
+  vmImageName: 'ubuntu-latest'
+
+stages:
+  # ---------------------------------------------------------------------
+  - stage: Build
+    displayName: 'Build & Unit Test'
+    jobs:
+      - job: BuildAndTest
+        pool:
+          vmImage: $(vmImageName)
+        steps:
+          - task: UseDotNet@2
+            displayName: 'Install .NET SDK'
+            inputs:
+              packageType: 'sdk'
+              version: '8.x'
+
+          - task: DotNetCoreCLI@2
+            displayName: 'Restore'
+            inputs:
+              command: 'restore'
+              projects: '**/*.csproj'
+
+          - task: DotNetCoreCLI@2
+            displayName: 'Build'
+            inputs:
+              command: 'build'
+              projects: '**/*.csproj'
+              arguments: '--configuration $(buildConfiguration) --no-restore'
+
+          - task: DotNetCoreCLI@2
+            displayName: 'Run unit tests'
+            inputs:
+              command: 'test'
+              projects: '**/*Tests.csproj'
+              arguments: '--configuration $(buildConfiguration) --collect "Code coverage"'
+
+          - task: DotNetCoreCLI@2
+            displayName: 'Publish artifact'
+            inputs:
+              command: 'publish'
+              publishWebProjects: true
+              arguments: '--configuration $(buildConfiguration) --output $(Build.ArtifactStagingDirectory)'
+              zipAfterPublish: true
+
+          - publish: '$(Build.ArtifactStagingDirectory)'
+            artifact: 'drop'
+
+  # ---------------------------------------------------------------------
+  - stage: SecurityScan
+    displayName: 'Security & Compliance Gate'
+    dependsOn: Build
+    jobs:
+      - job: DependencyAndCodeScan
+        pool:
+          vmImage: $(vmImageName)
+        steps:
+          - task: WhiteSource@21
+            displayName: 'Open-source dependency scan (Mend/WhiteSource)'
+            continueOnError: true
+
+          - task: CredScan@3
+            displayName: 'Credential scanner'
+
+          - task: PublishSecurityAnalysisLogs@3
+            displayName: 'Publish security analysis logs'
+            inputs:
+              ArtifactName: 'CodeAnalysisLogs'
+
+          - task: PostAnalysis@2
+            displayName: 'Break build on security findings'
+            inputs:
+              GdnBreakGdnToolCredScan: true
+              GdnBreakAllTools: false
+
+  # ---------------------------------------------------------------------
+  - stage: ProvisionDev
+    displayName: 'Provision Dev Infrastructure'
+    dependsOn: SecurityScan
+    variables:
+      environmentSuffix: 'dev'
+    jobs:
+      - job: DeployBicep
+        pool:
+          vmImage: $(vmImageName)
+        steps:
+          - task: AzureCLI@2
+            displayName: 'Create resource group'
+            inputs:
+              azureSubscription: $(azureSubscription)
+              scriptType: 'bash'
+              scriptLocation: 'inlineScript'
+              inlineScript: |
+                az group create --name $(resourceGroupName) --location $(location)
+
+          - task: AzureResourceManagerTemplateDeployment@3
+            displayName: 'Deploy Bicep - dev'
+            inputs:
+              deploymentScope: 'Resource Group'
+              azureResourceManagerConnection: $(azureSubscription)
+              subscriptionId: '$(subscriptionId)'
+              action: 'Create Or Update Resource Group'
+              resourceGroupName: $(resourceGroupName)
+              location: $(location)
+              templateLocation: 'Linked artifact'
+              csmFile: 'bicep/main.bicep'
+              overrideParameters: '-appName $(appName) -environmentName dev'
+              deploymentMode: 'Incremental'
+
+  # ---------------------------------------------------------------------
+  - stage: DeployDev
+    displayName: 'Deploy to Dev'
+    dependsOn: ProvisionDev
+    variables:
+      environmentSuffix: 'dev'
+    jobs:
+      - deployment: DeployWebAppDev
+        environment: 'dev'
+        pool:
+          vmImage: $(vmImageName)
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - task: AzureWebApp@1
+                  displayName: 'Deploy to Azure App Service (dev)'
+                  inputs:
+                    azureSubscription: $(azureSubscription)
+                    appType: 'webAppLinux'
+                    appName: '$(appName)-dev'
+                    package: '$(Pipeline.Workspace)/drop/**/*.zip'
+
+                - task: AzureCLI@2
+                  displayName: 'Smoke test'
+                  inputs:
+                    azureSubscription: $(azureSubscription)
+                    scriptType: 'bash'
+                    scriptLocation: 'scriptPath'
+                    scriptPath: 'scripts/smoke_test.sh'
+                    arguments: 'https://$(appName)-dev.azurewebsites.net'
+
+  # ---------------------------------------------------------------------
+  - stage: DeployStaging
+    displayName: 'Deploy to Staging'
+    dependsOn: DeployDev
+    variables:
+      environmentSuffix: 'staging'
+    jobs:
+      - deployment: DeployWebAppStaging
+        # 'staging' environment has a manual-approval check configured in
+        # Azure DevOps (Environments -> staging -> Approvals and checks)
+        environment: 'staging'
+        pool:
+          vmImage: $(vmImageName)
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - task: AzureResourceManagerTemplateDeployment@3
+                  displayName: 'Deploy Bicep - staging'
+                  inputs:
+                    deploymentScope: 'Resource Group'
+                    azureResourceManagerConnection: $(azureSubscription)
+                    subscriptionId: '$(subscriptionId)'
+                    action: 'Create Or Update Resource Group'
+                    resourceGroupName: 'rg-app-staging'
+                    location: $(location)
+                    templateLocation: 'Linked artifact'
+                    csmFile: 'bicep/main.bicep'
+                    overrideParameters: '-appName $(appName) -environmentName staging'
+                    deploymentMode: 'Incremental'
+
+                - task: AzureWebApp@1
+                  displayName: 'Deploy to Azure App Service (staging slot)'
+                  inputs:
+                    azureSubscription: $(azureSubscription)
+                    appType: 'webAppLinux'
+                    appName: '$(appName)-staging'
+                    deployToSlotOrASE: true
+                    slotName: 'staging'
+                    package: '$(Pipeline.Workspace)/drop/**/*.zip'
+
+                - task: AzureCLI@2
+                  displayName: 'Smoke test staging slot'
+                  inputs:
+                    azureSubscription: $(azureSubscription)
+                    scriptType: 'bash'
+                    scriptLocation: 'scriptPath'
+                    scriptPath: 'scripts/smoke_test.sh'
+                    arguments: 'https://$(appName)-staging-staging.azurewebsites.net'
+
+  # ---------------------------------------------------------------------
+  - stage: DeployProd
+    displayName: 'Deploy to Production'
+    dependsOn: DeployStaging
+    variables:
+      environmentSuffix: 'prod'
+    jobs:
+      - deployment: DeployWebAppProd
+        # 'prod' environment requires manual approval + business-hours
+        # deployment window, configured in Azure DevOps Environments.
+        environment: 'prod'
+        pool:
+          vmImage: $(vmImageName)
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - task: AzureResourceManagerTemplateDeployment@3
+                  displayName: 'Deploy Bicep - prod'
+                  inputs:
+                    deploymentScope: 'Resource Group'
+                    azureResourceManagerConnection: $(azureSubscription)
+                    subscriptionId: '$(subscriptionId)'
+                    action: 'Create Or Update Resource Group'
+                    resourceGroupName: 'rg-app-prod'
+                    location: $(location)
+                    templateLocation: 'Linked artifact'
+                    csmFile: 'bicep/main.bicep'
+                    overrideParameters: '-appName $(appName) -environmentName prod'
+                    deploymentMode: 'Incremental'
+
+                - task: AzureWebApp@1
+                  displayName: 'Swap staging slot into production'
+                  inputs:
+                    azureSubscription: $(azureSubscription)
+                    appType: 'webAppLinux'
+                    appName: '$(appName)-prod'
+                    resourceGroupName: 'rg-app-prod'
+                    slotName: 'staging'
+                    swapWithProduction: true
+
+                - task: AzureCLI@2
+                  displayName: 'Post-deploy smoke test (prod)'
+                  inputs:
+                    azureSubscription: $(azureSubscription)
+                    scriptType: 'bash'
+                    scriptLocation: 'scriptPath'
+                    scriptPath: 'scripts/smoke_test.sh'
+                    arguments: 'https://$(appName)-prod.azurewebsites.net'
