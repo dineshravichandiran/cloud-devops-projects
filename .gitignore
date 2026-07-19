@@ -4,6 +4,10 @@
 *.tfstate.*
 crash.log
 **/build/
+.terraform.lock.hcl
+
+# Bicep compiled output
+**/bicep/*.json
 # Python
 __pycache__/
 *.pyc
