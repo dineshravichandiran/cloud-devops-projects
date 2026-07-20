@@ -21,6 +21,17 @@ instructions.
 
 ---
 
+## Proof of work
+
+The DevSecOps pipeline wasn't just written and left — it runs on every push, and it broke: every
+run failed at the SAST step because CodeQL was configured to scan for JavaScript/TypeScript in a
+repo that has none. Found the root cause, fixed it, and verified the pipeline runs past that point
+now, live on GitHub Actions:
+
+![DevSecOps CI Pipeline failing on every push due to a CodeQL language misconfiguration, root cause found, fixed, and reverified live](screenshots/devsecops-pipeline-bug-and-fix.png)
+
+---
+
 ## 🔐 End-to-End DevSecOps CI Pipeline
 
 A CI pipeline that shifts security **left** and enforces it as a required gate — a build cannot
