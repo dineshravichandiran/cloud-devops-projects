@@ -79,3 +79,7 @@ rather than something baked into pipeline code.
 2. Create three Environments (`dev`, `staging`, `prod`) and add approval checks to `staging` and `prod`.
 3. Set the `subscriptionId` pipeline variable (or wire it via a variable group) to your Azure subscription ID.
 4. Point `azure-pipelines.yml` at your actual `.csproj` paths if this is adapted to a different app than the placeholder .NET project referenced here.
+
+## Current verification status
+
+Written and reviewed, not yet run end-to-end — this one hasn't gone through the same live-testing pass as the other projects in this account, since it needs an Azure DevOps organization and subscription that wasn't available while building this. The YAML is internally consistent (stage dependencies, environment references, and variable usage all check out on read-through), but unlike `devsecops-ci-pipeline` (verified live in GitHub Actions after fixing 3 real bugs) or `ansible-zabbix-baseline` (verified in a real test environment), no claim is made here that this has actually executed successfully.
