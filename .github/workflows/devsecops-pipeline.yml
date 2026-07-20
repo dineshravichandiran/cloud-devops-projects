@@ -41,12 +41,12 @@ jobs:
           config: >-
             p/owasp-top-ten
             p/security-audit
-      - name: CodeQL init
-        uses: github/codeql-action/init@v3
-        with:
-          languages: javascript
-      - name: CodeQL analyze
-        uses: github/codeql-action/analyze@v3
+      # No CodeQL step here: this pipeline's "app" (build/webapp/index.html)
+      # is a synthetic placeholder generated at build time, not real checked-in
+      # source, so there's no Java/JS/Python for CodeQL to analyze. Semgrep
+      # above covers static analysis for what's actually in this repo
+      # (workflow YAML, Dockerfile, shell). Pointing CodeQL at a language here
+      # just fails every run with "no source code seen during build."
 
   sca:
     name: Software Composition Analysis
