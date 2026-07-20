@@ -142,6 +142,11 @@ jobs:
           rules_file_name: '${{ env.APP_DIR }}/.zap/rules.tsv'
           cmd_options: '-a'
           fail_action: false
+          # The action defaults to auto-filing a GitHub issue with findings, which
+          # needs `issues: write` (not granted above, and not something we want —
+          # it would open a new issue on every run that has any warning). The scan
+          # results are already uploaded to the Security tab; disable issue creation.
+          allow_issue_writing: false
 
   deploy-staging:
     name: Deploy to Staging
