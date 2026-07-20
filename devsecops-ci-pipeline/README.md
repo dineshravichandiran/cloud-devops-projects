@@ -15,7 +15,7 @@ commit
 [1] Secret Scanning ─────────── Gitleaks (blocks on any credential/token found)
   │
   ▼
-[2] SAST ───────────────────── Semgrep (OWASP Top 10 ruleset) + GitHub CodeQL
+[2] SAST ───────────────────── Semgrep (OWASP Top 10 ruleset)
   │
   ▼
 [3] SCA ────────────────────── OWASP Dependency-Check (CVE audit of 3rd-party libs)
@@ -36,19 +36,29 @@ commit
 [8] Security Policy Gate ───── final go/no-go before promotion
 ```
 
-Findings from Semgrep, CodeQL, Dependency-Check, and Trivy are all uploaded as **SARIF** to the GitHub *Security* tab, so every vulnerability is tracked centrally instead of buried in build logs.
+Findings from Semgrep, Dependency-Check, and Trivy are all uploaded as **SARIF** to the GitHub *Security* tab, so every vulnerability is tracked centrally instead of buried in build logs.
 
 ## Stack
 
 | Concern              | Tool                          |
 |----------------------|--------------------------------|
 | Secret scanning       | Gitleaks                      |
-| SAST                  | Semgrep, GitHub CodeQL        |
+| SAST                  | Semgrep                       |
 | SCA / dependency audit| OWASP Dependency-Check         |
 | Container hardening   | Multi-stage Dockerfile, non-root user, minimal base image |
 | Container scanning    | Trivy                          |
 | DAST                   | OWASP ZAP (baseline scan)     |
 | Orchestration          | GitHub Actions                |
+
+> **Note:** an earlier version of this pipeline also ran GitHub CodeQL in the SAST stage. Removed it — this repo's "app" is a synthetic placeholder page generated at build time, not real checked-in Java/JS/Python source, so CodeQL had nothing valid to analyze and failed every single run with "no source code seen during build." Semgrep covers static analysis for what's actually in this repo (workflow YAML, Dockerfile). See "Proof this actually runs" below for how that was found.
+
+## Proof this actually runs
+
+This isn't a pipeline that was written once and left — it runs on every push, and for a while it failed on **every single run**, including pushes that had nothing to do with the pipeline itself. Found and fixed three separate real failures blocking it end-to-end (the CodeQL issue above, a missing `issues: write` token permission, and a third-party action's broken artifact upload), re-verifying live in GitHub Actions after each fix:
+
+![DevSecOps CI Pipeline failing on every push due to a CodeQL language misconfiguration, root cause found, fixed, and reverified live](../screenshots/devsecops-pipeline-bug-and-fix.png)
+
+All 8 stages now pass clean: [![CI](https://github.com/dineshravichandiran/cloud-devops-projects/actions/workflows/devsecops-pipeline.yml/badge.svg)](https://github.com/dineshravichandiran/cloud-devops-projects/actions/workflows/devsecops-pipeline.yml)
 
 ## Repository layout
 

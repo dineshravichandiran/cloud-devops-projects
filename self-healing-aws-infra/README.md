@@ -93,6 +93,14 @@ Confirm the SNS email subscription (check your inbox) so remediation alerts actu
 Watch the `self-healing-app-self-healing` CloudWatch dashboard, or query the
 `SelfHealingInfra` namespace directly, to confirm the remediation metric fired.
 
+## Current verification status
+
+Being upfront about exactly what's been checked here, not what's assumed:
+
+- ✅ `terraform validate` passes clean against this configuration
+- ✅ Both Lambda handlers reviewed line-by-line for correct boto3/AWS API usage (correct client calls, correct parameters, least-privilege IAM matching what each function actually touches)
+- 📋 **Not yet deployed to a real AWS account** — no `terraform apply` has been run against live infrastructure, so the simulated-failure scripts above haven't been executed and the CloudWatch dashboard hasn't actually shown a real remediation event yet. The code is sound; it hasn't been proven end-to-end against real AWS the way the other projects in this account have.
+
 ## Design decisions
 
 - **Layered, not single-point**: native AWS mechanisms (ELB health checks, EC2 auto-recover) handle the failure modes they're built for; Lambda only steps in for cases those mechanisms don't reach.
