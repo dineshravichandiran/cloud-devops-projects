@@ -67,8 +67,15 @@ devsecops-ci-pipeline/
 ├── .github/workflows/devsecops-pipeline.yml   # the full pipeline definition
 ├── .zap/rules.tsv                              # ZAP scan rule overrides
 ├── Dockerfile                                   # hardened runtime image
+├── k8s/
+│   ├── deployment.yaml                         # Deployment: 2 replicas, non-root, resource limits, probes
+│   └── service.yaml                            # ClusterIP Service fronting the container's port 8080
 └── README.md
 ```
+
+## Kubernetes manifests — 📋 Illustrative, not cluster-tested
+
+`k8s/deployment.yaml` and `k8s/service.yaml` show how the image this pipeline builds would actually run on Kubernetes: 2 replicas, the same non-root `securityContext` as the Dockerfile, CPU/memory requests+limits, and readiness/liveness probes against `/`. They haven't been applied against a real cluster — no `kubectl apply` has been run here — so treat them as a correct, reviewed starting point, not a "verified running in prod" claim.
 
 ## Design decisions
 
