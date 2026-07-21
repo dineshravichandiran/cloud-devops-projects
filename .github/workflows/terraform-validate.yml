@@ -1,0 +1,36 @@
+name: Terraform Validate (self-healing-aws-infra)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'self-healing-aws-infra/terraform/**'
+      - '.github/workflows/terraform-validate.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'self-healing-aws-infra/terraform/**'
+  workflow_dispatch:
+
+jobs:
+  validate:
+    name: terraform fmt & validate
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: self-healing-aws-infra/terraform
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.15.8"
+
+      - name: terraform fmt (check only)
+        run: terraform fmt -check -recursive
+
+      - name: terraform init (no backend, no cloud credentials needed)
+        run: terraform init -backend=false
+
+      - name: terraform validate
+        run: terraform validate
