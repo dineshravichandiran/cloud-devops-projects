@@ -12,8 +12,8 @@ operations experience into repeatable, secure, self-service delivery.
 
 | Project | What it demonstrates |
 |---------|----------------------|
-| 🔐 **[End-to-End DevSecOps CI Pipeline](devsecops-ci-pipeline)** | Security-integrated automated delivery — a GitHub Actions pipeline that gates every deployment behind secret scanning, SAST, dependency (SCA) auditing, container image scanning, and DAST. |
-| ♻️ **[Self-Healing Infrastructure on AWS](self-healing-aws-infra)** | Auto-recovery and resilience — Terraform-provisioned VPC/ALB/Auto Scaling Group with CloudWatch alarms and Lambda-based auto-remediation that detects and recovers from failure with no human in the loop. |
+| 🔐 **[End-to-End DevSecOps CI Pipeline](https://github.com/dineshravichandiran/devsecops-ci-pipeline)** | Now in its own repository: a GitHub Actions pipeline that runs secret scanning, SAST, dependency (SCA) auditing, container image scanning, and DAST on every push, with findings in the GitHub Security tab. |
+| ♻️ **[Self-Healing Infrastructure on AWS](self-healing-aws-infra)** | Auto-recovery and resilience — Terraform-provisioned VPC/ALB/Auto Scaling Group with CloudWatch alarms and Lambda-based auto-remediation designed to detect and recover from failure without a human in the loop. Validated with `terraform validate` and code review; not yet applied to a live AWS account. |
 | 🔄 **[End-to-End Azure DevOps Project](azure-devops-pipeline)** | Full CI/CD on Azure — a multi-stage Azure DevOps pipeline that builds, security-scans, provisions infrastructure with Bicep, and promotes releases through dev → staging → production with approvals and slot swaps. |
 
 Each project folder has its own README with an architecture diagram, design rationale, and setup
@@ -21,33 +21,11 @@ instructions.
 
 ---
 
-## Proof of work
+## Moved: DevSecOps CI pipeline
 
-The DevSecOps pipeline wasn't just written and left — it runs on every push, and it broke: every
-run failed at the SAST step because CodeQL was configured to scan for JavaScript/TypeScript in a
-repo that has none. Found the root cause, fixed it, and verified the pipeline runs past that point
-now, live on GitHub Actions:
-
-![DevSecOps CI Pipeline failing on every push due to a CodeQL language misconfiguration, root cause found, fixed, and reverified live](screenshots/devsecops-pipeline-bug-and-fix.png)
-
----
-
-## 🔐 End-to-End DevSecOps CI Pipeline
-
-A CI pipeline that shifts security **left** and enforces it as a required gate — a build cannot
-reach staging without passing every check.
-
-```
-commit → Secret Scan (Gitleaks) → SAST (Semgrep + CodeQL) → SCA (OWASP Dependency-Check)
-       → Build hardened container → Container Scan (Trivy) → DAST (OWASP ZAP)
-       → Deploy to Staging → Security Policy Gate
-```
-
-Every scanner uploads **SARIF** to the GitHub Security tab, so findings become native code-scanning
-alerts instead of being buried in build logs. Fail-fast ordering runs the cheap checks (secrets,
-SAST) before the expensive build.
-
-**Stack:** GitHub Actions · Gitleaks · Semgrep · CodeQL · OWASP Dependency-Check · Trivy · OWASP ZAP · hardened non-root Docker image
+The DevSecOps pipeline now has its own repository, with its proof-of-work screenshot and a plain
+description of which scans block the pipeline and which only report:
+**[dineshravichandiran/devsecops-ci-pipeline](https://github.com/dineshravichandiran/devsecops-ci-pipeline)**
 
 ---
 
@@ -65,7 +43,7 @@ top of native AWS primitives.
 | Load spike | Target-tracking scaling policy | ASG scales out |
 
 Every remediation publishes a custom CloudWatch metric, so self-healing is **provable**, not
-assumed. A chaos-test script validates the whole loop end-to-end.
+assumed. A chaos-test script is included to exercise the loop, but this has not yet been run against a live AWS account.
 
 **Stack:** Terraform · AWS VPC/ALB/Auto Scaling · CloudWatch · SNS · EventBridge · Lambda (Python) · least-privilege IAM
 
@@ -93,7 +71,6 @@ there's no cold-start gap.
 
 ```
 cloud-devops-projects/
-├── devsecops-ci-pipeline/     # GitHub Actions security pipeline + hardened Dockerfile
 ├── self-healing-aws-infra/    # Terraform + Lambda auto-remediation
 └── azure-devops-pipeline/     # Azure DevOps multi-stage pipeline + Bicep IaC
 ```
