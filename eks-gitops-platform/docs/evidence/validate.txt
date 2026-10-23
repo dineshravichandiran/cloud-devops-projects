@@ -1,0 +1,38 @@
+# EKS Terraform: validate-only evidence. 2026-10-23T10:26Z, Darwin arm64
+# NOT applied to any AWS account. No credentials were used.
+Terraform v1.17.0
+checkov 3.3.30
+
+$ terraform fmt -check -recursive
+formatted
+
+$ terraform init -backend=false
+Terraform has been successfully initialized!
+
+$ terraform validate
+Success! The configuration is valid.
+
+
+$ terraform test   (mocked AWS provider)
+tests/validation.tftest.hcl... in progress
+  run "rejects_an_endpoint_open_to_the_internet"... pass
+  run "rejects_an_empty_endpoint_allow_list"... pass
+  run "rejects_a_malformed_cidr"... pass
+  run "rejects_node_sizes_out_of_order"... pass
+  run "rejects_a_bad_cluster_name"... pass
+  run "rejects_a_vpc_that_is_too_small"... pass
+  run "accepts_a_valid_configuration"... pass
+  run "rejects_a_malformed_kubernetes_version"... pass
+tests/validation.tftest.hcl... tearing down
+tests/validation.tftest.hcl... pass
+
+Success! 8 passed, 0 failed.
+
+$ checkov -d . --framework terraform --skip-path .terraform
+terraform scan results:
+
+Passed checks: 3, Failed checks: 0, Skipped checks: 3
+
+
+
+tflint: NOT RUN (not available through Homebrew core on this machine)
