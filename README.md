@@ -14,6 +14,7 @@ operations experience into repeatable, secure, self-service delivery.
 |---------|----------------------|
 | 🔐 **[End-to-End DevSecOps CI Pipeline](https://github.com/dineshravichandiran/devsecops-ci-pipeline)** | Now in its own repository: a GitHub Actions pipeline that runs secret scanning, SAST, dependency (SCA) auditing, container image scanning, and DAST on every push, with findings in the GitHub Security tab. |
 | ♻️ **[Self-Healing Infrastructure on AWS](self-healing-aws-infra)** | Auto-recovery and resilience — Terraform-provisioned VPC/ALB/Auto Scaling Group with CloudWatch alarms and Lambda-based auto-remediation designed to detect and recover from failure without a human in the loop. Validated with `terraform validate` and code review; not yet applied to a live AWS account. |
+| ☸️ **[EKS GitOps Platform](eks-gitops-platform)** | Terraform for a small EKS cluster (private nodes, KMS-encrypted secrets, IRSA) with an Argo CD bootstrap plan. **Validated with `terraform validate`, mocked-provider tests and checkov; NOT applied to any AWS account.** |
 | 🔄 **[End-to-End Azure DevOps Project](azure-devops-pipeline)** | Full CI/CD on Azure — a multi-stage Azure DevOps pipeline that builds, security-scans, provisions infrastructure with Bicep, and promotes releases through dev → staging → production with approvals and slot swaps. |
 
 Each project folder has its own README with an architecture diagram, design rationale, and setup
