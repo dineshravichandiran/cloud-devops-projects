@@ -1,0 +1,21 @@
+# ILLUSTRATIVE, NOT APPLIED. The "root" Argo CD Application of an app-of-apps layout:
+# it watches a folder of child Applications and keeps them in sync.
+# Replace repoURL/path with a repository you control before using it.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: root
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/dineshravichandiran/k8s-self-healing-lab.git
+    targetRevision: main
+    path: deploy/argocd/apps        # a folder containing one Application manifest per workload
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
