@@ -1,0 +1,25 @@
+name: eks-terraform-validate
+
+# No AWS credentials are used: format, validate, and tests that run against a mocked provider.
+on:
+  push:
+    paths: ["eks-gitops-platform/**", ".github/workflows/eks-validate.yml"]
+  pull_request:
+    paths: ["eks-gitops-platform/**", ".github/workflows/eks-validate.yml"]
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: eks-gitops-platform
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+      - run: terraform fmt -check -recursive
+      - run: terraform init -backend=false -input=false
+      - run: terraform validate
+      - run: terraform test
