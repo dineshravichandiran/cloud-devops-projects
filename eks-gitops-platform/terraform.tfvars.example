@@ -1,0 +1,12 @@
+# Copy to terraform.tfvars (git-ignored) and edit. These are placeholders, not real values.
+region       = "ap-south-1"
+cluster_name = "gitops-lab"
+
+# Required, and 0.0.0.0/0 is rejected. 203.0.113.0/24 is a documentation range: replace it with YOUR address.
+endpoint_public_access_cidrs = ["203.0.113.10/32"]
+
+# Required. 1.33 is only an example: check which versions EKS supports before a real apply.
+kubernetes_version = "1.33"
+
+single_nat_gateway  = true      # false = one NAT per AZ (more resilient, costs more)
+node_instance_types = ["t3.medium"]
