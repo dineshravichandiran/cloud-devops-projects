@@ -15,7 +15,10 @@ resource "aws_cloudwatch_metric_alarm" "unhealthy_hosts" {
   evaluation_periods  = 2
   metric_name         = "UnHealthyHostCount"
   namespace           = "AWS/ApplicationELB"
-  period              = 30
+  # The ALB publishes this metric once a minute. A 30 second period leaves every other period
+  # empty, and with treat_missing_data = "notBreaching" that resets the count, so the alarm
+  # could never see two breaching periods in a row. Keep this a multiple of 60.
+  period              = 60
   statistic           = "Maximum"
   threshold           = 1
   alarm_description   = "Triggers self-healing remediation when the ALB reports unhealthy targets"
@@ -30,26 +33,11 @@ resource "aws_cloudwatch_metric_alarm" "unhealthy_hosts" {
   ok_actions    = [aws_sns_topic.self_healing_alerts.arn]
 }
 
-# Per-instance system status check failure -> built-in EC2 auto-recover action,
-# a native AWS self-healing mechanism for underlying hardware/hypervisor faults.
-resource "aws_cloudwatch_metric_alarm" "status_check_failed_system" {
-  alarm_name          = "${var.project_name}-status-check-failed-system"
-  comparison_operator = "GreaterThanOrEqualToThreshold"
-  evaluation_periods  = 2
-  metric_name         = "StatusCheckFailed_System"
-  namespace           = "AWS/EC2"
-  period              = 60
-  statistic           = "Maximum"
-  threshold           = 1
-  alarm_description   = "Recovers the instance automatically on underlying system status check failures"
-  treat_missing_data  = "notBreaching"
-
-  dimensions = {
-    AutoScalingGroupName = aws_autoscaling_group.app.name
-  }
-
-  alarm_actions = ["arn:aws:automate:${var.aws_region}:ec2:recover"]
-}
+# Note: the native EC2 auto-recover alarm (StatusCheckFailed_System -> ec2:recover) is not
+# part of this stack. That action only works on an alarm for one specific instance
+# (InstanceId dimension), and ASG members are created and replaced dynamically, so it
+# cannot be declared here. A failed host is covered by the ELB health check instead:
+# the ASG replaces the instance.
 
 # EventBridge: react to an instance unexpectedly stopping (e.g. OOM kill,
 # manual mistake) and start it back up if it's tagged for self-healing.
@@ -88,8 +76,8 @@ resource "aws_cloudwatch_dashboard" "self_healing" {
           view   = "timeSeries"
           region = var.aws_region
           metrics = [
-            ["SelfHealingInfra", "RemediationActionsTaken", "Action", "ReplacedUnhealthyInstance"],
-            ["SelfHealingInfra", "RemediationActionsTaken", "Action", "RestartedStoppedInstance"]
+            ["SelfHealingInfra", "RemediationActionsTaken", "Action", "ReplacedUnhealthyInstance", { "stat" = "Sum" }],
+            ["SelfHealingInfra", "RemediationActionsTaken", "Action", "RestartedStoppedInstance", { "stat" = "Sum" }]
           ]
         }
       },

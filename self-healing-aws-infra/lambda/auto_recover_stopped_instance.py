@@ -62,10 +62,7 @@ def handler(event, context):
         MetricData=[
             {
                 "MetricName": "RemediationActionsTaken",
-                "Dimensions": [
-                    {"Name": "Action", "Value": "RestartedStoppedInstance"},
-                    {"Name": "InstanceId", "Value": instance_id},
-                ],
+                "Dimensions": [{"Name": "Action", "Value": "RestartedStoppedInstance"}],
                 "Value": 1,
                 "Unit": "Count",
             }

@@ -4,7 +4,14 @@ data "aws_ami" "amazon_linux" {
 
   filter {
     name   = "name"
-    values = ["al2023-ami-*-x86_64"]
+    # The full AMI, not "al2023-ami-minimal-*": the minimal image has no SSM agent, so
+    # Systems Manager (used by scripts/simulate_failure.sh) cannot reach the instance.
+    values = ["al2023-ami-2023.*-kernel-*-x86_64"]
+  }
+
+  filter {
+    name   = "architecture"
+    values = ["x86_64"]
   }
 }
 
@@ -14,6 +21,10 @@ resource "aws_launch_template" "app" {
   instance_type = var.instance_type
 
   vpc_security_group_ids = [aws_security_group.app.id]
+
+  iam_instance_profile {
+    name = aws_iam_instance_profile.instance.name
+  }
 
   user_data = base64encode(<<-EOF
     #!/bin/bash
@@ -27,7 +38,8 @@ resource "aws_launch_template" "app" {
   tag_specifications {
     resource_type = "instance"
     tags = {
-      Name = "${var.project_name}-instance"
+      Name        = "${var.project_name}-instance"
+      SelfHealing = "true"
     }
   }
 

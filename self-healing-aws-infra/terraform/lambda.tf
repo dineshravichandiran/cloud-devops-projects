@@ -22,6 +22,7 @@ resource "aws_lambda_function" "unhealthy_remediation" {
   environment {
     variables = {
       METRIC_NAMESPACE = "SelfHealingInfra"
+      TARGET_GROUP_ARN = aws_lb_target_group.app.arn
     }
   }
 }
