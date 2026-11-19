@@ -18,11 +18,11 @@ resource "aws_cloudwatch_metric_alarm" "unhealthy_hosts" {
   # The ALB publishes this metric once a minute. A 30 second period leaves every other period
   # empty, and with treat_missing_data = "notBreaching" that resets the count, so the alarm
   # could never see two breaching periods in a row. Keep this a multiple of 60.
-  period              = 60
-  statistic           = "Maximum"
-  threshold           = 1
-  alarm_description   = "Triggers self-healing remediation when the ALB reports unhealthy targets"
-  treat_missing_data  = "notBreaching"
+  period             = 60
+  statistic          = "Maximum"
+  threshold          = 1
+  alarm_description  = "Triggers self-healing remediation when the ALB reports unhealthy targets"
+  treat_missing_data = "notBreaching"
 
   dimensions = {
     TargetGroup  = aws_lb_target_group.app.arn_suffix

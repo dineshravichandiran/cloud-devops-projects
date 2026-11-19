@@ -3,7 +3,7 @@ data "aws_ami" "amazon_linux" {
   owners      = ["amazon"]
 
   filter {
-    name   = "name"
+    name = "name"
     # The full AMI, not "al2023-ami-minimal-*": the minimal image has no SSM agent, so
     # Systems Manager (used by scripts/simulate_failure.sh) cannot reach the instance.
     values = ["al2023-ami-2023.*-kernel-*-x86_64"]
