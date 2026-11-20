@@ -103,11 +103,12 @@ Applied to a real AWS account (ap-south-1), drilled, then destroyed. What was ch
 
 - ✅ `terraform validate` passes and the handler tests pass (6 tests, mocked boto3)
 - ✅ Applied live: VPC, ALB, ASG (2 instances), both Lambdas, alarm, dashboard, SNS
-- ✅ Drill B: a stopped, tagged instance was restarted by the Lambda
-- ✅ Drill C: alarm, Lambda, ASG replacement chain fired end to end, and the `SelfHealingInfra` custom metric recorded it
-- ✅ Destroyed afterwards and checked for leftover resources
+- ✅ Drill A (clean run): ELB health check failure, ASG replaced the instance in about 2 min, healthy in about 3 min
+- ✅ Drill B: a stopped, tagged instance was restarted by the Lambda (running again in about 1 min)
+- ✅ Drill C: with the ASG health check suspended, alarm (about 5 min 26 s), Lambda, ASG replacement fired end to end, healthy about 6 min 47 s after the failure, and the `SelfHealingInfra` custom metric recorded it
+- ✅ Destroyed afterwards (30 resources) and checked for leftover resources
 - 🔧 Running it found four defects that validation alone could not (AMI without SSM agent, alarm period, EC2 auto-recover on ASG members, missing `DescribeTargetHealth`); all fixed
-- 📋 Not measured: clean detection-to-replacement time, cost, load-triggered scale-out
+- 📋 Not measured: cost, load-triggered scale-out; each drill was run once
 
 Details, timings and the defects are in [docs/evidence.md](docs/evidence.md).
 
