@@ -4,8 +4,8 @@
 "This is Terraform for a small EKS cluster built the way I'd want a production one to start: nodes in private subnets,
 the API endpoint restricted to specific CIDRs, secrets encrypted with KMS, control-plane logs, and IRSA. The unsafe
 mistakes are blocked by validation rather than by a note in the README: you cannot open the API to 0.0.0.0/0. I validated it
-with terraform validate, a mocked-provider test suite and checkov. I have **not** applied it to an AWS account, and I say
-so in the README."
+with terraform validate, a mocked-provider test suite and checkov, then applied it once to a real account, checked the
+cluster, ran an Argo CD self-heal drill, destroyed it and swept the region for leftovers. The evidence is in the repo."
 
 ## Questions to expect
 1. **Why private subnets for nodes?** Nodes and pods don't need inbound internet exposure; outbound goes through NAT. Only load balancers sit in public subnets.
@@ -20,8 +20,9 @@ so in the README."
 10. **What would you add before using it for real?** Private-only endpoint plus a VPN or bastion, a remote encrypted state backend with locking, node group hardening and Pod Security settings, cost alarms, and a real plan/apply pipeline with approvals.
 
 ## Limits (say them out loud)
-Not applied; not planned against real AWS; tflint not run; cost not estimated; the Argo CD bootstrap is a described plan plus one illustrative manifest.
+Applied once for a short drill, not run as a long-lived cluster. tflint not run. Cost not measured. The app-of-apps root Application was not applied (the drill used one public example Application). No load balancer, IRSA, scaling or private-only endpoint test.
 
 ## "Have you used EKS?"
-"Not in production: my day job is AKS and Kubernetes operations. I wrote and validated EKS Terraform to learn the AWS side,
-and I haven't applied it to an account. I can explain every setting and what I'd change before running it for real."
+"Not in production: my day job is AKS and Kubernetes operations. I wrote EKS Terraform to learn the AWS side and ran it once
+on a real account: cluster up, nodes Ready, Argo CD self-heal drill, then destroyed and checked for leftovers. I can explain
+every setting and what I'd change before running it for real."

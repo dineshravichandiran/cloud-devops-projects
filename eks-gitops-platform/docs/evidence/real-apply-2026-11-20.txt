@@ -1,0 +1,55 @@
+eks-gitops-platform: real apply, drill and destroy
+Date: 2026-11-20 (UTC times). Region ap-south-1. Account ID redacted.
+Run from AWS CloudShell with Terraform 1.12.2 and local state, kubernetes_version 1.34
+(chosen from `aws eks describe-cluster-versions`, standard-support list at the time: 1.37 1.36 1.35 1.34).
+endpoint_public_access_cidrs was a single /32 (the CloudShell egress address).
+
+== apply ==
+10:05:46Z  terraform apply started (plan: 55 to add, 0 to change, 0 to destroy)
+           EKS control plane took about 9 minutes to create; node group about 2 more
+10:18Z     "Apply complete! Resources: 55 added, 0 changed, 0 destroyed."  (~12.5 min in total)
+
+== checks on the live cluster (10:18:23Z) ==
+NAME                                       STATUS  VERSION               INTERNAL-IP
+ip-10-0-15-127.ap-south-1.compute.internal Ready   v1.34.12-eks-9adbfea  10.0.15.127
+ip-10-0-26-199.ap-south-1.compute.internal Ready   v1.34.12-eks-9adbfea  10.0.26.199
+(AL2023, no external IP: nodes are in private subnets)
+
+kube-system: aws-node x2 (2/2), coredns x2 (1/1), kube-proxy x2 (1/1), all Running, 0 restarts
+
+aws eks describe-cluster --name gitops-lab (selected fields):
+  version            1.34
+  status             ACTIVE
+  publicCidrs        [ <one /32> ]        (not 0.0.0.0/0)
+  privateEndpoint    true
+  secretsEncrypted   [ "secrets" ]        (customer-managed KMS key)
+  logs               api, audit, authenticator, controllerManager, scheduler
+
+== GitOps drill ==
+Argo CD installed from the official install manifest (image quay.io/argoproj/argocd:v3.6.2).
+All 7 Argo CD pods Running (application-controller, applicationset-controller, dex, notifications, redis, repo-server, server).
+
+Application "guestbook" (public example repo argoproj/argocd-example-apps, path guestbook,
+automated sync with prune and selfHeal):
+  after ~45 s:   guestbook  Synced  Healthy ; deployment guestbook-ui 1/1, pod Running
+  self-heal test: `kubectl delete deploy guestbook-ui`
+  after ~30 s:   deployment guestbook-ui 1/1 again (age 31s), new pod name, guestbook Synced Healthy
+So Argo CD recreated the deleted workload from Git without any manual step.
+
+== destroy ==
+10:22:26Z  terraform destroy started
+10:33Z     "Destroy complete! Resources: 55 destroyed."  (~11 min: node group about 8 min, control plane about 2 min)
+
+== leftover check after destroy (10:33Z, ap-south-1) ==
+EKS clusters: none | EC2 instances: none | NAT gateways: none | Elastic IPs: none
+Load balancers (ELBv2 and classic): none | EBS volumes: none | non-default VPCs: none
+CloudWatch log groups /aws/eks*: none | IAM roles containing gitops-lab: none
+IAM OIDC providers: only the existing GitHub Actions one from another project (not part of this stack)
+KMS aliases for the cluster: none (the customer-managed key is scheduled for deletion by the module's default window;
+a key pending deletion is not usable and I did not verify its billing)
+
+== not done ==
+- The root Application in bootstrap/root-application.yaml (app-of-apps) was NOT applied; the drill used one
+  Application pointing at a public example repository instead.
+- No load balancer, ingress, IRSA role use or node scaling test was run.
+- Cost was not measured here. Check Cost Explorer before quoting any figure.
