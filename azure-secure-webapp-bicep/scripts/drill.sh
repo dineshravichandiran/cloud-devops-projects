@@ -2,7 +2,7 @@
 # Helper for docs/RUNBOOK.md. Run it in Azure Cloud Shell (bash) from the repo folder.
 #   scripts/drill.sh deploy     what-if, deploy, push the app code
 #   scripts/drill.sh prove      show the Key Vault reference status and call the app
-#   scripts/drill.sh deny       deploy again without the role assignment, restart, show failure
+#   scripts/drill.sh deny       delete the role assignment, restart, poll until the reference fails
 #   scripts/drill.sh restore    deploy again with the role assignment, restart, show recovery
 #   scripts/drill.sh destroy    delete the resource group and purge the soft-deleted vault
 #   scripts/drill.sh sweep      list what is left in the subscription
@@ -55,12 +55,31 @@ case "${1:-}" in
     echo "## secret-check"; call /secret-check
     ;;
   deny)
-    date -u +"%FT%TZ role assignment removed (grantKeyVaultAccess=false)"
-    az deployment group create -g "$RG" -n main -f "$HERE/main.bicep" -p grantKeyVaultAccess=false --mode Complete -o none
-    az webapp restart -g "$RG" -n "$(app_name)"
-    sleep 60
+    # A Complete-mode redeploy with grantKeyVaultAccess=false does NOT remove the role assignment (it is an
+    # extension resource on the vault), so the role is deleted explicitly. Key Vault also keeps authorizing for
+    # a while after the delete. In the one real run the reference kept resolving for about 12 minutes after the
+    # delete and a restart; the first 503 came about 2.5 minutes after the app setting was saved again. One run
+    # cannot say whether the save or the passing time caused it, so the script does both and polls.
+    # This version of the phase has not been re-run end to end.
+    app=$(app_name); V=$(vault_name)
+    vid=$(az keyvault show -n "$V" --query id -o tsv)
+    pid=$(az webapp identity show -g "$RG" -n "$app" --query principalId -o tsv)
+    date -u +"%FT%TZ deleting role assignment"
+    az role assignment delete --assignee "$pid" --role "Key Vault Secrets User" --scope "$vid"
+    echo "role assignments left on the vault: $(az role assignment list --scope "$vid" --query 'length(@)' -o tsv)"
+    az webapp restart -g "$RG" -n "$app"
+    ref=$(az webapp config appsettings list -g "$RG" -n "$app" --query "[?name=='DEMO_SECRET'].value|[0]" -o tsv)
+    for i in $(seq 1 40); do
+      if [ "$i" = "30" ]; then
+        date -u +"%FT%TZ saving the app setting again to force a new lookup"
+        az webapp config appsettings set -g "$RG" -n "$app" --settings "DEMO_SECRET=$ref" -o none
+      fi
+      code=$(curl -s -o /tmp/body.json -w '%{http_code}' --max-time 30 "$(app_url)/secret-check" || true)
+      echo "$(date -u +%T) secret-check -> HTTP $code $(cut -c1-100 /tmp/body.json 2>/dev/null)"
+      [ "$code" = "503" ] && break
+      sleep 20
+    done
     echo "## Key Vault reference status"; ref_status
-    echo "## secret-check (expect failure)"; call /secret-check || true
     ;;
   restore)
     date -u +"%FT%TZ role assignment restored"

@@ -1,0 +1,59 @@
+Azure secure web app (Bicep): first real deployment, drills, destroy and leftover check
+Run in Azure Cloud Shell (bash, no storage mount), Azure free account, region centralindia, App Service plan B1.
+All times UTC, 2026-11-20. Numbers below were read from the terminal as the run happened.
+
+1. Before deploying
+   - Resource providers Microsoft.Web, Microsoft.KeyVault, Microsoft.OperationalInsights were NotRegistered on the
+     new subscription. Registered them (and Microsoft.Insights). All four showed Registered at 12:31:17.
+   - az bicep lint main.bicep: exit 0, one warning (no-unnecessary-dependson on main.bicep line 73, 'vault').
+     az bicep build: exit 0. The warning is still there; it is not fixed.
+
+2. Deploy (scripts/drill.sh deploy)
+   - Started 12:31:50. Deployment "main" Succeeded at 12:34:35 (Incremental), script printed "deployment finished" 12:34:55.
+   - The container's first start failed with exit code 2 at about 12:34 (ContainerStartupFailure), probably because
+     app.py had not been uploaded yet (I did not confirm the cause). The zip deploy then reported "Build successful" and the site started: second start succeeded at
+     12:36:08, App Service reported "Site started" 12:37:48.
+   - `az webapp deploy` kept printing "Starting the site..." for 209 s and I interrupted the wait at about 12:40.
+     The site was already answering /health with HTTP 200.
+
+3. Prove (12:40:56 - 12:41:01)
+   - Key Vault reference for DEMO_SECRET: status Resolved, "Reference has been successfully resolved."
+   - GET /health -> 200 {"status": "ok"}
+   - GET /secret-check -> 200 {"configured": true, "resolved": true, "length": 36, "sha256_prefix": "35a2f638"}
+
+4. Deny drill, first attempt: the script's version did not work (12:41:20 - 12:45:36)
+   - The script redeployed with grantKeyVaultAccess=false in Complete mode and printed "role assignment removed".
+   - It had not been removed. `az role assignment list` on the vault still showed Key Vault Secrets User, created
+     12:34:33. A Complete-mode redeploy does not delete that role assignment (it is an extension resource on the vault).
+   - The reference still showed Resolved and /secret-check returned 200, but with sha256_prefix 360c3ec4 instead of
+     35a2f638: the template's secret default is newGuid(), so every redeploy writes a new secret value.
+   - Result: bug in my script, not in Azure. drill.sh deny was rewritten to delete the role explicitly.
+
+5. Deny drill, second attempt: explicit delete (the run that failed as expected)
+   - 12:46:23 az role assignment delete (Key Vault Secrets User, app's managed identity, scope = the vault).
+     Role assignments left on the vault: 0.
+   - 12:46:26 az webapp restart. /secret-check stayed 200 (resolved true) for about 8.5 minutes, polled every ~20 s
+     through 12:54:55. At 12:55:36 the reference status still said Resolved, with 0 role assignments on the vault.
+   - 12:56:10 saved the DEMO_SECRET app setting again (same value) to force a new lookup.
+   - /secret-check 200 until 12:58:31. First 503 at 12:58:51: {"configured": true, "resolved": false}.
+   - Reference status: AccessToKeyVaultDenied, "Key Vault reference was not able to be resolved because site was denied
+     access to Key Vault reference's vault."
+   - So access was lost about 12 min 28 s after the role was deleted. One run cannot say whether the setting save or the
+     passing time caused it. Do not read this as "role removal takes effect in 12 minutes".
+
+6. Restore (scripts/drill.sh restore, 12:59:12 - 13:03:43)
+   - Redeployed with grantKeyVaultAccess=true; the role assignment came back. Reference status Resolved.
+   - /secret-check: HTTP 000 (restarting), HTTP 000, then HTTP 200 on attempt 3 with sha256_prefix 05a16609
+     (the secret rotated again on that deployment). Recovery took about 4.5 minutes including a restart.
+
+7. Destroy and leftover check
+   - 13:05:15 destroy started. 13:06:35 resource group deleted. Vault purge issued (the script prints nothing on success).
+   - Sweep at 13:06:48: no resource groups, no resources, no soft-deleted vaults in the subscription.
+   - Deploy to destroy took about 35 minutes.
+
+What this does not show
+   - I did not query Log Analytics or Application Insights, so the Key Vault audit logs and AppServiceHTTPLogs are
+     unverified.
+   - No cost figure. Cost Management had not been read when this was written.
+   - Single region, single instance, public network access on the vault (no private endpoint), no autoscale.
+   - The rewritten `drill.sh deny` has not been run end to end; the manual commands in section 5 were.

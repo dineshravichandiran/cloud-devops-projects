@@ -5,8 +5,38 @@ from Key Vault through a **Key Vault reference**, using its own **system-assigne
 (no passwords or connection strings in the code or the deployment). Logs and metrics go to Log Analytics
 and Application Insights.
 
-> **Status: written, not applied yet.** `main.bicep` has not been deployed to a real subscription as of this
-> commit. This page is updated with what was actually run (and what was not) after the first real deployment.
+> **Status: applied once to a real Azure subscription, drilled, destroyed (2026-11-20).** Evidence, with times, is in
+> [`docs/evidence/real-deploy-2026-11-20.txt`](docs/evidence/real-deploy-2026-11-20.txt). It ran on an Azure free account in
+> Central India (B1 plan) and was deleted the same day; leftover check clean.
+
+## What running it showed
+
+| Step | Result |
+|---|---|
+| Deploy | Infrastructure deployment succeeded in about 3 minutes; the app answered `/health` with 200 after the code upload |
+| Key Vault reference | `Resolved`; `/secret-check` 200 with `resolved: true` (the secret is never returned) |
+| Remove the role assignment | Access was lost only after about 12.5 minutes: `/secret-check` 503 and reference status `AccessToKeyVaultDenied` |
+| Put it back | Recovered in about 4.5 minutes, 200 again |
+| Destroy | Resource group deleted in about 80 seconds, vault purged, sweep found nothing left |
+
+Things the run found that I had got wrong or had not expected:
+
+- **My deny step did not deny anything.** I redeployed in Complete mode with the role switched off and the script said
+  "role assignment removed", but the role was still on the vault. Complete mode does not delete that extension
+  resource. The script now deletes the role explicitly. The rewritten script has not been re-run end to end.
+- **Revoking a role is not instant for a Key Vault reference.** The reference kept resolving for about 12 minutes after the
+  delete and a restart. I also saved the app setting again before the first failure and cannot tell from one run which
+  of the two caused it.
+- **The secret changes on every deployment.** The template generates it with `newGuid()`, so each redeploy rotates it
+  (the hash prefix changed between deployments). Fine for a demo, wrong for a real secret.
+- The container failed its first start before the code was uploaded, then came up after the zip deploy.
+
+## Not done
+
+- Log Analytics and Application Insights were created but I did not query them, so the audit and request logs are unverified.
+- No cost figure yet (Cost Management had not been read).
+- Single instance, single region, no autoscale, public network access on the vault (no private endpoint).
+- One lint warning (`no-unnecessary-dependson`) is still there. No CI deployment; the pipeline only lints and builds.
 
 ## What it builds
 
