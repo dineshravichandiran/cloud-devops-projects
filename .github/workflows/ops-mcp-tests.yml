@@ -1,0 +1,25 @@
+name: ops-mcp-server-tests
+
+# No AWS or Kubernetes access: AWS calls run against botocore's Stubber and kubectl is a stand-in script.
+on:
+  push:
+    paths: ["ops-mcp-server/**", ".github/workflows/ops-mcp-tests.yml"]
+  pull_request:
+    paths: ["ops-mcp-server/**", ".github/workflows/ops-mcp-tests.yml"]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ops-mcp-server
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements-dev.txt
+      - run: python -m pytest -q
