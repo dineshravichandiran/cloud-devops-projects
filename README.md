@@ -16,7 +16,8 @@ operations experience into repeatable, secure, self-service delivery.
 | ♻️ **[Self-Healing Infrastructure on AWS](self-healing-aws-infra)** | Auto-recovery and resilience — Terraform-provisioned VPC/ALB/Auto Scaling Group with CloudWatch alarms and Lambda-based auto-remediation designed to detect and recover from failure without a human in the loop. Applied to a live AWS account (ap-south-1), drilled with real failures and then destroyed; the run found and fixed four defects. Evidence in [`docs/evidence.md`](self-healing-aws-infra/docs/evidence.md). |
 | ☸️ **[EKS GitOps Platform](eks-gitops-platform)** | Terraform for a small EKS cluster (private nodes, KMS-encrypted secrets, IRSA) with an Argo CD bootstrap plan. **Applied once to a real AWS account (nodes Ready, Argo CD self-heal drill), destroyed, and checked for leftovers; evidence in `docs/evidence`. Also validated offline with mocked-provider tests and checkov.** |
 | 🤖 **[Ops MCP Server](ops-mcp-server)** | An MCP server giving an AI agent read-only AWS and Kubernetes tools, with writes (deployment restart, Auto Scaling capacity) that run only with a person-approved, single-use approval bound to exact parameters. Tested in CI with stubs and a stand-in kubectl; only a few read-only calls ran against a live AWS account, and nothing against a real cluster. |
-| 🔄 **[End-to-End Azure DevOps Project](azure-devops-pipeline)** | Full CI/CD on Azure — a multi-stage Azure DevOps pipeline that builds, security-scans, provisions infrastructure with Bicep, and promotes releases through dev → staging → production with approvals and slot swaps. |
+| 🔐 **[Azure Secure Web App (Bicep)](azure-secure-webapp-bicep)** | App Service with a system-assigned managed identity reading a secret from Key Vault through a Key Vault reference, with Log Analytics and Application Insights. **Applied once to a real Azure subscription (2026-11-20): removing the role assignment made the app return 503 `AccessToKeyVaultDenied` after about 12 minutes, restoring it brought 200 back; destroyed and checked for leftovers. Evidence and the bugs found in my own drill script are in `docs/evidence`.** |
+| 🔄 **[End-to-End Azure DevOps Project](azure-devops-pipeline)** | Full CI/CD on Azure — a multi-stage Azure DevOps pipeline that builds, security-scans, provisions infrastructure with Bicep, and promotes releases through dev → staging → production with approvals and slot swaps. **Written and validated offline; not run end to end (it needs an Azure DevOps organization).** |
 
 Each project folder has its own README with an architecture diagram, design rationale, and setup
 instructions.
@@ -45,7 +46,7 @@ top of native AWS primitives.
 | Load spike | Target-tracking scaling policy | ASG scales out |
 
 Every remediation publishes a custom CloudWatch metric, so self-healing is **provable**, not
-assumed. A chaos-test script is included to exercise the loop, but this has not yet been run against a live AWS account.
+assumed. The chaos-test script was run against a live AWS account (ap-south-1); see `self-healing-aws-infra/docs/evidence.md`.
 
 **Stack:** Terraform · AWS VPC/ALB/Auto Scaling · CloudWatch · SNS · EventBridge · Lambda (Python) · least-privilege IAM
 
@@ -74,5 +75,8 @@ there's no cold-start gap.
 ```
 cloud-devops-projects/
 ├── self-healing-aws-infra/    # Terraform + Lambda auto-remediation
+├── eks-gitops-platform/       # Terraform EKS + Argo CD
+├── ops-mcp-server/            # MCP server with approval-gated writes
+├── azure-secure-webapp-bicep/ # App Service + managed identity + Key Vault (Bicep)
 └── azure-devops-pipeline/     # Azure DevOps multi-stage pipeline + Bicep IaC
 ```
