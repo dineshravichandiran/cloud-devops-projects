@@ -1,0 +1,32 @@
+name: azure-bicep-validate
+
+on:
+  push:
+    paths:
+      - 'azure-secure-webapp-bicep/**'
+      - '.github/workflows/azure-bicep-validate.yml'
+  pull_request:
+    paths:
+      - 'azure-secure-webapp-bicep/**'
+
+permissions:
+  contents: read
+
+jobs:
+  bicep:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: azure-secure-webapp-bicep
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Bicep
+        run: az bicep install
+      - name: Lint
+        run: az bicep lint --file main.bicep
+      - name: Build (compile to ARM JSON)
+        run: az bicep build --file main.bicep --stdout > /dev/null
+      - name: App syntax and script syntax
+        run: |
+          python3 -m py_compile app/app.py
+          bash -n scripts/drill.sh
