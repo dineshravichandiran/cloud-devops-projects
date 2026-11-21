@@ -1,5 +1,7 @@
 # 🔄 End-to-End Azure DevOps Project
 
+> **Note:** this folder is the original draft and was never run. The version that was run on a real Azure DevOps organization on 2026-11-21 (with fixes and evidence) is in [azure-iac-bicep](https://github.com/dineshravichandiran/azure-iac-bicep/tree/main/azure-devops-pipeline).
+
 A complete CI/CD pipeline on Azure DevOps that takes a change from commit to production: build, test, security gate, infrastructure provisioning, and a progressive dev → staging → production rollout with slot swaps and approval gates.
 
 ## Why this exists

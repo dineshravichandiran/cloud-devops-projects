@@ -17,7 +17,7 @@ operations experience into repeatable, secure, self-service delivery.
 | ☸️ **[EKS GitOps Platform](eks-gitops-platform)** | Terraform for a small EKS cluster (private nodes, KMS-encrypted secrets, IRSA) with an Argo CD bootstrap plan. **Applied once to a real AWS account (nodes Ready, Argo CD self-heal drill), destroyed, and checked for leftovers; evidence in `docs/evidence`. Also validated offline with mocked-provider tests and checkov.** |
 | 🤖 **[Ops MCP Server](ops-mcp-server)** | An MCP server giving an AI agent read-only AWS and Kubernetes tools, with writes (deployment restart, Auto Scaling capacity) that run only with a person-approved, single-use approval bound to exact parameters. Tested in CI with stubs and a stand-in kubectl; only a few read-only calls ran against a live AWS account, and nothing against a real cluster. |
 | 🔐 **[Azure Secure Web App (Bicep)](azure-secure-webapp-bicep)** | App Service with a system-assigned managed identity reading a secret from Key Vault through a Key Vault reference, with Log Analytics and Application Insights. **Applied once to a real Azure subscription (2026-11-20): removing the role assignment made the app return 503 `AccessToKeyVaultDenied` after about 12 minutes, restoring it brought 200 back; destroyed and checked for leftovers. Evidence and the bugs found in my own drill script are in `docs/evidence`.** |
-| 🔄 **[End-to-End Azure DevOps Project](azure-devops-pipeline)** | Full CI/CD on Azure — a multi-stage Azure DevOps pipeline that builds, security-scans, provisions infrastructure with Bicep, and promotes releases through dev → staging → production with approvals and slot swaps. **Written and validated offline; not run end to end (it needs an Azure DevOps organization).** |
+| 🔄 **[End-to-End Azure DevOps Project](azure-devops-pipeline)** | Full CI/CD on Azure — a multi-stage Azure DevOps pipeline that builds, security-scans, provisions infrastructure with Bicep, and promotes releases through dev → staging → production with approvals and slot swaps. **Run end to end on a real Azure DevOps organization on 2026-11-21 (three failed runs fixed, the fourth green through dev, staging and production), then destroyed. The version that was run, with the evidence, lives in [azure-iac-bicep](https://github.com/dineshravichandiran/azure-iac-bicep/tree/main/azure-devops-pipeline); the copy in this repo is the original, unrun draft.** |
 
 Each project folder has its own README with an architecture diagram, design rationale, and setup
 instructions.
@@ -58,7 +58,7 @@ A complete CI/CD path on Azure DevOps: build → security gate → infrastructur
 progressive dev → staging → production rollout.
 
 ```
-Build & Test → Security Scan (CredScan + dependency scan) → Provision (Bicep)
+Build & Test → Security checks (vulnerable packages, credential grep, Bicep lint) → Provision (Bicep)
             → Deploy Dev → Deploy Staging (approval) → Deploy Prod (approval + slot swap)
 ```
 
